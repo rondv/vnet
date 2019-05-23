@@ -130,7 +130,7 @@ func (m *bridgeMain) DelBridge(stag uint16) {
 
 func (br *bridge) AddMember(pe *vnet.PortEntry) {
 	br.Validate()
-	if si, ok := vnet.SiByIfindex[pe.Ifindex]; ok {
+	if si, ok := vnet.Ports.GetSiByIndex(pe.Ifindex); ok {
 		br.members[si] = pe
 		return
 	}
@@ -324,9 +324,10 @@ func ProcessChangeUpper(msg *xeth.MsgChangeUpper, action vnet.ActionType, v *vne
 
 	m := GetMain(v)
 	if br, ok := m.bridges[portUpper.Stag]; ok {
-		si := vnet.SiByIfindex[portLower.Ifindex]
-		br.Validate()
-		br.members[si] = portLower
+		if si, si_ok := vnet.Ports.GetSiByIndex(portLower.Ifindex); si_ok {
+			br.Validate()
+			br.members[si] = portLower
+		}
 	}
 
 	if msg.Linking == 0 {

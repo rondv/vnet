@@ -84,7 +84,7 @@ func (m *Main) showIpNeighbor(c cli.Commander, w cli.Writer, in *cli.Input) (err
 			ai := ip.AdjNil
 			ln := 0
 			rwSi := n.Si
-			if n.Si.Kind(v) == vnet.SwBridgeInterface {
+			if n.Si.Kind(v) == vnet.SwIfKindBridgeInterface {
 				br := GetBridgeBySi(n.Si)
 				rwSi, _ = br.LookupSiCtag(n.Ethernet, v)
 			}
