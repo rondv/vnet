@@ -13,6 +13,8 @@ import (
 	"github.com/platinasystems/xeth"
 )
 
+const AllowUntaggedBrm = true
+
 type macEntry struct {
 	si      vnet.Si
 	devName string
@@ -314,8 +316,8 @@ func ProcessChangeUpper(msg *xeth.MsgChangeUpper, action vnet.ActionType, v *vne
 		err = dbgvnet.Bridge.Logf("lower %v, not found", msg.Lower)
 		return
 	}
-	if portLower.Devtype != xeth.XETH_DEVTYPE_LINUX_VLAN &&
-		portLower.Devtype != xeth.XETH_DEVTYPE_LINUX_VLAN_BRIDGE_PORT {
+	if !AllowUntaggedBrm && (portLower.Devtype != xeth.XETH_DEVTYPE_LINUX_VLAN &&
+		portLower.Devtype != xeth.XETH_DEVTYPE_LINUX_VLAN_BRIDGE_PORT) {
 		dbgvnet.Bridge.Logf("lower[%v] type=%v not vlan, not supported as brm",
 			msg.Lower,
 			portLower.Devtype)
@@ -344,7 +346,9 @@ func ProcessChangeUpper(msg *xeth.MsgChangeUpper, action vnet.ActionType, v *vne
 				m.CallBridgeMemberAddDelHooks(fdbBrm.stag, si,
 					fdbBrm.pipe_port, portLower.Ctag, false, numBrmOnPort(fdbBri.portIfindex))
 				portLower.Stag = 0
-				portLower.Devtype = xeth.XETH_DEVTYPE_LINUX_VLAN
+				if !AllowUntaggedBrm {
+					portLower.Devtype = xeth.XETH_DEVTYPE_LINUX_VLAN
+				}
 			} else {
 				dbgvnet.Bridge.Logf("fdbBri not found %+v", fdbBrm)
 			}
@@ -373,7 +377,9 @@ func ProcessChangeUpper(msg *xeth.MsgChangeUpper, action vnet.ActionType, v *vne
 		//v.BridgeMemberAddDelHook(fdbBrm.stag, si,
 		m.CallBridgeMemberAddDelHooks(fdbBrm.stag, si,
 			fdbBrm.pipe_port, portLower.Ctag, true, numBrmOnPort(fdbBri.portIfindex))
-		portLower.Devtype = xeth.XETH_DEVTYPE_LINUX_VLAN_BRIDGE_PORT
+		if !AllowUntaggedBrm {
+			portLower.Devtype = xeth.XETH_DEVTYPE_LINUX_VLAN_BRIDGE_PORT
+		}
 	}
 	return
 }
