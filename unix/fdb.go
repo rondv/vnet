@@ -203,7 +203,12 @@ func (e *fdbEvent) EventAction() {
 			err = ProcessInterfaceInfo((*xeth.MsgIfinfo)(ptr), e.evType, vn)
 		case xeth.XETH_MSG_KIND_CHANGE_UPPER:
 			if AllowBridge {
-				err = ethernet.ProcessChangeUpper((*xeth.MsgChangeUpper)(ptr), e.evType, vn)
+				chgUpper := (*xeth.MsgChangeUpper)(ptr)
+				if isOrphan(chgUpper.Lower) {
+					dbgfdb.XethMsg.Log("change-upper: ignore orphan", chgUpper.Lower)
+				} else {
+					err = ethernet.ProcessChangeUpper(chgUpper, e.evType, vn)
+				}
 			}
 		case xeth.XETH_MSG_KIND_ETHTOOL_FLAGS:
 			msg := (*xeth.MsgEthtoolFlags)(ptr)
@@ -413,7 +418,8 @@ func ProcessIpNeighbor(msg *xeth.MsgNeighUpdate, v *vnet.Vnet) (err error) {
 		return
 	}
 
-	dbgfdb.Neigh.Logf("msg.Dst %v ip %v %v\n", msg.Dst, addr, vnet.SiName{V: v, Si: si})
+	dbgfdb.Neigh.Logf("msg.Dst %v ip %v %v, isDel %v\n",
+		msg.Dst, addr, vnet.SiName{V: v, Si: si}, isDel)
 	nbr := ethernet.IpNeighbor{
 		Si:       si,
 		Ethernet: ethernet.Address(msg.Lladdr),
@@ -1179,6 +1185,37 @@ func ScopeTranslate(scope uint8) string {
 	}
 }
 
+var orphanIfindexList []int32
+
+func isOrphan(ifindex int32) bool {
+	for _, i := range orphanIfindexList {
+		if ifindex == i {
+			return true
+		}
+	}
+	return false
+}
+
+func (m *FdbMain) fdbOrphanSet(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
+	var ifindex int32
+
+	for !in.End() {
+		switch {
+		case in.Parse("help"):
+			fmt.Fprintln(w, "ifindex <idx>")
+		case in.Parse("if%*index %d", &ifindex):
+			orphanIfindexList = append(orphanIfindexList, ifindex)
+		default:
+			err = cli.ParseError
+			return
+		}
+	}
+
+	fmt.Fprintf(w, "orphanIfindexList: %+v\n", orphanIfindexList)
+
+	return
+}
+
 type fdbBridgeMember struct {
 	stag      uint16
 	pipe_port uint16
@@ -1244,6 +1281,11 @@ func (m *FdbMain) cliInit() (err error) {
 			Name:      "show ports",
 			ShortHelp: "help",
 			Action:    m.fdbPortShow,
+		},
+		cli.Command{
+			Name:      "set orphan",
+			ShortHelp: "help",
+			Action:    m.fdbOrphanSet,
 		},
 	}
 	for i := range cmds {
